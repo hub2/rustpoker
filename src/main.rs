@@ -1,4 +1,4 @@
-use poker::{create_deck, get_best, Player, Table};
+use crate::pokerlogic::logic::*;
 use std::io::{self};
 use std::thread;
 use std::time::Duration;
