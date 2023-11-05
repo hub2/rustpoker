@@ -1,5 +1,5 @@
-use poker::{create_deck, get_best, Card, Player, Rank, Suite, Table};
-use std::io::{self, Write};
+use poker::{create_deck, get_best, Player, Table};
+use std::io::{self};
 use std::thread;
 use std::time::Duration;
 
@@ -44,15 +44,83 @@ fn main() -> io::Result<()> {
 
     table.cards.push(deck.deal_one());
 
-    player1.cards.append(&mut table.cards);
-    player2.cards.append(&mut table.cards);
+    player1.cards.append(&mut table.cards.clone());
+    player2.cards.append(&mut table.cards.clone());
 
+    println!("");
     println!("Your cards");
     for card in player1.cards.iter() {
         print!("{} ", card);
     }
     println!("");
-    get_best(&player1);
+    let mut best = get_best(&player1);
+    println!("\n");
+    println!("Opponent cards");
+    for card in player2.cards.iter() {
+        print!("{} ", card);
+    }
+    println!("");
+    let mut best2 = get_best(&player2);
+    println!("\n");
+    println!("{} {}", best.poker_hand.value(), best2.poker_hand.value());
+
+    if best.poker_hand.value() > best2.poker_hand.value() {
+        println!("You won!");
+    } else if best.poker_hand.value() < best2.poker_hand.value() {
+        println!("You lost!");
+    } else {
+        best.cards
+            .sort_by(|a, b| a.rank.value().cmp(&b.rank.value()));
+        best2
+            .cards
+            .sort_by(|a, b| a.rank.value().cmp(&b.rank.value()));
+
+        let player1_won: bool = best
+            .cards
+            .clone()
+            .into_iter()
+            .map(|x| x.rank.value())
+            .zip(best2.cards.clone().into_iter().map(|x| x.rank.value()))
+            .map(|(a, b)| a > b)
+            .collect::<Vec<_>>()
+            .contains(&true);
+        if player1_won {
+            println!("You won!");
+        } else {
+            let player2_won: bool = best
+                .cards
+                .into_iter()
+                .map(|x| x.rank.value())
+                .zip(best2.cards.into_iter().map(|x| x.rank.value()))
+                .map(|(a, b)| a < b)
+                .collect::<Vec<_>>()
+                .contains(&true);
+            if player2_won {
+                println!("You lost!");
+            } else {
+                player1
+                    .cards
+                    .sort_by(|a, b| a.rank.value().cmp(&b.rank.value()));
+                player2
+                    .cards
+                    .sort_by(|a, b| a.rank.value().cmp(&b.rank.value()));
+                let player1_won: bool = player1
+                    .cards
+                    .into_iter()
+                    .take(5)
+                    .map(|x| x.rank.value())
+                    .zip(player2.cards.into_iter().take(5).map(|x| x.rank.value()))
+                    .map(|(a, b)| a > b)
+                    .collect::<Vec<_>>()
+                    .contains(&true);
+                if player1_won {
+                    println!("You won!");
+                } else {
+                    println!("You lost!");
+                }
+            }
+        }
+    }
 
     //    let mut buffer = String::new();
     //    io::stdin().read_line(&mut buffer)?;

@@ -1,6 +1,5 @@
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::collections::HashMap;
 use std::fmt;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -30,7 +29,7 @@ pub enum Rank {
     Ace,
 }
 impl Rank {
-    fn value(&self) -> i32 {
+    pub fn value(&self) -> i32 {
         match *self {
             Rank::Two => 2,
             Rank::Three => 3,
@@ -133,9 +132,11 @@ impl fmt::Display for Suite {
 
 //fn compare_players(p1: &Player, p2: &Player) -> &Player {}
 
+#[derive(Clone)]
 pub enum PokerHandEnum {
     Poker,
     Four,
+    Flush,
     Full,
     Straight,
     Three,
@@ -147,8 +148,9 @@ pub enum PokerHandEnum {
 impl PokerHandEnum {
     pub fn value(&self) -> i32 {
         match *self {
-            PokerHandEnum::Poker => 8,
-            PokerHandEnum::Four => 7,
+            PokerHandEnum::Poker => 9,
+            PokerHandEnum::Four => 8,
+            PokerHandEnum::Flush => 7,
             PokerHandEnum::Full => 6,
             PokerHandEnum::Straight => 5,
             PokerHandEnum::Three => 4,
@@ -160,8 +162,8 @@ impl PokerHandEnum {
 }
 
 pub struct PokerHand {
-    poker_hand: PokerHandEnum,
-    cards: Vec<Card>,
+    pub poker_hand: PokerHandEnum,
+    pub cards: Vec<Card>,
 }
 
 pub fn get_best(p: &Player) -> PokerHand {
@@ -184,6 +186,13 @@ pub fn get_best(p: &Player) -> PokerHand {
     if let Ok(ret) = flush(&mut cards) {
         println!(
             "Found flush!! {} {} {} {} {}",
+            ret.cards[0], ret.cards[1], ret.cards[2], ret.cards[3], ret.cards[4]
+        );
+        return ret;
+    }
+    if let Ok(ret) = fullhouse(&mut cards) {
+        println!(
+            "Found fullhouse!! {} {} {} {} {}",
             ret.cards[0], ret.cards[1], ret.cards[2], ret.cards[3], ret.cards[4]
         );
         return ret;
@@ -256,8 +265,11 @@ fn test_straight() {
     ];
     cards.sort_by(|a, b| a.rank.value().cmp(&b.rank.value()));
     let x = straight(&mut cards);
-
     assert_eq!(x.is_ok(), true);
+}
+
+#[test]
+fn test_straight_wheel() {
     let mut cards2 = vec![
         Card {
             rank: Rank::Ace,
@@ -284,12 +296,48 @@ fn test_straight() {
             suite: Suite::Heart,
         },
         Card {
-            rank: Rank::Eight,
-            suite: Suite::Heart,
+            rank: Rank::Five,
+            suite: Suite::Spade,
         },
     ];
     cards2.sort_by(|a, b| a.rank.value().cmp(&b.rank.value()));
     let x = straight(&mut cards2);
+    assert_eq!(x.is_ok(), true);
+}
+#[test]
+fn test_fullhouse() {
+    let mut cards = vec![
+        Card {
+            rank: Rank::Two,
+            suite: Suite::Heart,
+        },
+        Card {
+            rank: Rank::Two,
+            suite: Suite::Spade,
+        },
+        Card {
+            rank: Rank::Four,
+            suite: Suite::Heart,
+        },
+        Card {
+            rank: Rank::Four,
+            suite: Suite::Clubs,
+        },
+        Card {
+            rank: Rank::Six,
+            suite: Suite::Heart,
+        },
+        Card {
+            rank: Rank::Four,
+            suite: Suite::Clubs,
+        },
+        Card {
+            rank: Rank::Eight,
+            suite: Suite::Heart,
+        },
+    ];
+    cards.sort_by(|a, b| a.rank.value().cmp(&b.rank.value()));
+    let x = fullhouse(&mut cards);
     assert_eq!(x.is_ok(), true);
 }
 #[test]
@@ -337,21 +385,11 @@ pub fn poker(tmp_cards: &mut Vec<Card>) -> Result<PokerHand, NotFoundError> {
     cards.dedup();
 
     // lets not use first three, we will get it in the loop with + 1
-    let mut iter = cards.iter();
-    iter.next();
-    iter.next();
-    iter.next();
-    iter.next();
+    let iter = cards.iter().skip(4);
 
     for (i, _el) in iter.enumerate().rev() {
         let mut found_poker = true;
         for idx in 0..4 {
-            println!("{}", i + idx);
-            println!(
-                "{} {}",
-                tmp_cards[i + idx].rank.value(),
-                tmp_cards[i + idx + 1].rank.value()
-            );
             if !(tmp_cards[i + idx].rank.value() + 1 == tmp_cards[i + idx + 1].rank.value()
                 && tmp_cards[i + idx].suite == tmp_cards[i + idx + 1].suite)
             {
@@ -370,11 +408,33 @@ pub fn poker(tmp_cards: &mut Vec<Card>) -> Result<PokerHand, NotFoundError> {
 
     Err(NotFoundError)
 }
+pub fn fullhouse(tmp_cards: &mut Vec<Card>) -> Result<PokerHand, NotFoundError> {
+    let mut poker_hand = PokerHand {
+        cards: Vec::new(),
+        poker_hand: PokerHandEnum::Full,
+    };
+    let mut cards = tmp_cards.clone();
+    let mut three_result = three(&mut cards)?;
 
+    let iter = tmp_cards.iter().skip(1);
+
+    for (i, _el) in iter.enumerate().rev() {
+        if tmp_cards[i].rank.value() == tmp_cards[i + 1].rank.value()
+            && tmp_cards[i].rank.value() != three_result.cards[0].rank.value()
+        {
+            poker_hand.cards.push(tmp_cards[i].clone());
+            poker_hand.cards.push(tmp_cards[i + 1].clone());
+            poker_hand.cards.append(&mut three_result.cards);
+            return Ok(poker_hand);
+        }
+    }
+
+    Err(NotFoundError)
+}
 pub fn flush(tmp_cards: &mut Vec<Card>) -> Result<PokerHand, NotFoundError> {
     let mut poker_hand = PokerHand {
         cards: Vec::new(),
-        poker_hand: PokerHandEnum::Pair,
+        poker_hand: PokerHandEnum::Flush,
     };
     for suite in Suite::iter() {
         let cards: Vec<Card> = tmp_cards
@@ -400,29 +460,29 @@ pub fn straight(tmp_cards: &mut Vec<Card>) -> Result<PokerHand, NotFoundError> {
     let mut cards = tmp_cards.clone();
     cards.dedup();
 
-    // lets not use first three, we will get it in the loop with + 1
-    let mut iter = cards.iter();
-    iter.next();
-    iter.next();
-    iter.next();
-    iter.next();
+    // lets not use first four, we will get it in the loop with + n
+    let iter = cards.iter().skip(4);
+    if cards[cards.len() - 1].rank.value() == Rank::Ace.value()
+        && cards[3].rank.value() == Rank::Five.value()
+    {
+        for idx in 0..5 {
+            poker_hand.cards.push(cards[idx].clone());
+        }
+
+        return Ok(poker_hand);
+    }
 
     for (i, _el) in iter.enumerate().rev() {
         let mut found_straight = true;
         for idx in 0..4 {
-            println!(
-                "{} {}",
-                tmp_cards[i + idx].rank.value(),
-                tmp_cards[i + idx + 1].rank.value()
-            );
-            if !(tmp_cards[i + idx].rank.value() + 1 == tmp_cards[i + idx + 1].rank.value()) {
+            if !(cards[i + idx].rank.value() + 1 == cards[i + idx + 1].rank.value()) {
                 found_straight = false;
                 break;
             }
         }
         if found_straight {
             for idx in 0..5 {
-                poker_hand.cards.push(tmp_cards[i + idx].clone());
+                poker_hand.cards.push(cards[i + idx].clone());
             }
 
             return Ok(poker_hand);
@@ -467,9 +527,7 @@ pub fn three(tmp_cards: &mut Vec<Card>) -> Result<PokerHand, NotFoundError> {
     };
 
     // lets not use first two, we will get it in the loop with + 1
-    let mut iter = tmp_cards.iter();
-    iter.next();
-    iter.next();
+    let iter = tmp_cards.iter().skip(2);
 
     for (i, _el) in iter.enumerate().rev() {
         if tmp_cards[i].rank.value() == tmp_cards[i + 1].rank.value()
@@ -492,8 +550,7 @@ pub fn two_pair(tmp_cards: &mut Vec<Card>) -> Result<PokerHand, NotFoundError> {
     };
 
     // lets not use first one, we will get it in the loop with + 1
-    let mut iter = tmp_cards.iter();
-    iter.next();
+    let iter = tmp_cards.iter().skip(1);
     let mut found_one = false;
 
     let mut first_pair_rank = Rank::Two;
