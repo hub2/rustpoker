@@ -1,4 +1,7 @@
-use crate::pokerlogic::logic::*;
+mod pokerlogic;
+use crate::pokerlogic::logic::{create_deck, get_best};
+use crate::pokerlogic::models::{Player, Table};
+
 use std::io::{self};
 use std::thread;
 use std::time::Duration;
